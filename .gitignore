@@ -1,0 +1,20 @@
+# Dependencies and build output
+node_modules/
+.next/
+out/
+dist/
+coverage/
+
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+
+# Local runtime artifacts
+*.log
+.agent-workspaces/
+.playwright-mcp/
+tsconfig.tsbuildinfo
+
+# Local Supabase CLI state (may contain project-specific metadata)
+supabase/.temp/
