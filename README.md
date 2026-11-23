@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/header.png" alt="Crew — AI development workbench. Plan, build and review with AI agents." width="100%">
+</p>
+
 # Crew — AI Agent Workbench
 
 > A review-first AI development workflow: an Orchestrator plans the work, Develop proposes a constrained patch, and Testing checks it before a human decides what to do next.
