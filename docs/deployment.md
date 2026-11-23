@@ -48,6 +48,32 @@ npm run deploy:serv00
 
 The deployment script does not provision secrets and does not apply the SQL migrations to production. Apply required migrations using the approved database access procedure before deploying code that depends on them.
 
+## GitHub Actions deployment
+
+The repository includes:
+
+- `CI` — runs lint/type-check, Vitest, and the production build for pull requests and pushes to `main`.
+- `Deploy production` — manually deploys the selected `main` revision after the same checks pass. It does not deploy pull requests or run on every push.
+
+The deployment workflow uses GitHub-hosted Ubuntu runners and does not perform `git pull` on Serv00. It builds a fresh artifact, syncs source/build output while excluding `.env*` and local state, installs production dependencies remotely, then restarts Passenger. It never prints or transfers the remote `.env.production`.
+
+### Configure deployment credentials
+
+Create a dedicated SSH key for GitHub Actions rather than reusing a personal SSH key. The private key belongs in GitHub Actions secrets only; install the matching public key in the Serv00 account's `~/.ssh/authorized_keys`.
+
+Add these repository secrets under **Settings → Secrets and variables → Actions** (preferably scoped to the `production` environment):
+
+| Secret | Value |
+| --- | --- |
+| `SERV00_SSH_PRIVATE_KEY` | Dedicated deploy private key, including its PEM/OpenSSH header and footer |
+| `SERV00_KNOWN_HOSTS` | Verified `known_hosts` entry for `s16.serv00.com` |
+
+Verify the SSH host fingerprint against Serv00's trusted documentation or support before adding it. Do not use `ssh-keyscan` output without validating the fingerprint out of band. The workflow currently targets the Serv00 account and application directory shown in the production topology above.
+
+Then run **Actions → Deploy production → Run workflow**, selecting `main`. To add a human approval gate, configure required reviewers for the `production` environment in the repository settings. Keep deployment manual until the workflow has been validated; only then consider automatic deployment after protected merges to `main`.
+
+The workflow intentionally does not run migrations. Any future schema migration must be applied through the approved production database procedure before deploying dependent code.
+
 ## Database migrations
 
 Migrations are idempotent SQL files in `migrations/`. `scripts/migrate.mjs` applies the ordered list for local development. The current production schema includes:

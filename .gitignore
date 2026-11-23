@@ -18,3 +18,6 @@ tsconfig.tsbuildinfo
 
 # Local Supabase CLI state (may contain project-specific metadata)
 supabase/.temp/
+
+# Local SSH deployment key (never commit)
+.ssh-deploy/

@@ -1,0 +1,99 @@
+name: Deploy production
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: serv00-production
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: Verify release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint and type-check
+        run: npm run lint
+
+      - name: Run tests
+        run: npm test
+
+      - name: Build production app
+        run: npm run build
+
+  deploy:
+    name: Deploy to Serv00
+    needs: verify
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build production app
+        run: npm run build
+
+      - name: Configure SSH
+        env:
+          DEPLOY_KEY: ${{ secrets.SERV00_SSH_PRIVATE_KEY }}
+          KNOWN_HOSTS: ${{ secrets.SERV00_KNOWN_HOSTS }}
+        run: |
+          test -n "$DEPLOY_KEY" || { echo "Missing SERV00_SSH_PRIVATE_KEY secret" >&2; exit 1; }
+          test -n "$KNOWN_HOSTS" || { echo "Missing SERV00_KNOWN_HOSTS secret" >&2; exit 1; }
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$DEPLOY_KEY" > ~/.ssh/serv00_deploy
+          chmod 600 ~/.ssh/serv00_deploy
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Confirm production configuration exists
+        run: |
+          ssh -i ~/.ssh/serv00_deploy -o IdentitiesOnly=yes prostiner@s16.serv00.com \
+            "test -s '/usr/home/prostiner/domains/demo.prostiner.serv00.net/public_nodejs/.env.production'"
+
+      - name: Sync application files
+        run: |
+          rsync -az \
+            --exclude='.env*' \
+            --exclude='.git/' \
+            --exclude='node_modules/' \
+            --exclude='.next/cache/' \
+            --exclude='.playwright-mcp/' \
+            --exclude='.agent-workspaces/' \
+            --exclude='supabase/' \
+            --exclude='compose.db.yml' \
+            --exclude='coverage/' \
+            --exclude='*.log' \
+            --exclude='tsconfig.tsbuildinfo' \
+            -e 'ssh -i ~/.ssh/serv00_deploy -o IdentitiesOnly=yes' \
+            ./ prostiner@s16.serv00.com:/usr/home/prostiner/domains/demo.prostiner.serv00.net/public_nodejs/
+
+      - name: Install production dependencies and restart Passenger
+        run: |
+          ssh -i ~/.ssh/serv00_deploy -o IdentitiesOnly=yes prostiner@s16.serv00.com \
+            "cd '/usr/home/prostiner/domains/demo.prostiner.serv00.net/public_nodejs' && npm ci --omit=dev && devil www restart 'demo.prostiner.serv00.net'"

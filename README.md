@@ -139,6 +139,8 @@ npm run deploy:serv00
 
 The script expects an SSH alias named `prostiner-serv00`, a configured Serv00 Node.js domain, and an existing remote `.env.production`. Production secrets are stored in that file with mode `600`; `.env*` files are excluded from `rsync`.
 
+GitHub Actions also runs CI for pull requests and pushes to `main`. Production deployment is available as a manual workflow after configuring dedicated SSH secrets; see [the deployment guide](docs/deployment.md#github-actions-deployment).
+
 Deployment topology, required setup, migrations, and operational notes are in [docs/deployment.md](docs/deployment.md).
 
 ## Current verification status
