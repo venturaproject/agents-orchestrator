@@ -4,11 +4,12 @@ import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import {
   Activity, ArrowDown, ArrowUpRight, Bot, Check, CheckCheck, ChevronDown, Circle,
-  Code2, Command, Eye, EyeOff, FlaskConical, GitBranch, Globe2, Layers3,
-  LoaderCircle, LogOut, Menu, Moon, Plus, Sparkles, Sun,
+  Code2, Command, Eye, EyeOff, FlaskConical, GitBranch, Layers3,
+  LoaderCircle, Menu, Plus, Sparkles,
   Workflow, X,
 } from "lucide-react";
 import { messages, type Locale, type MessageKey } from "@/lib/translations";
+import { AccountMenu } from "@/components/account-menu";
 
 type Status = "done" | "active" | "queued" | "failed";
 type Task = { id: string; title: string; agent: "Develop" | "Testing" | "Orchestrator"; status: Status; detail: string; time: string };
@@ -40,7 +41,6 @@ export default function Home() {
   const [authMessage, setAuthMessage] = useState("");
   const [theme, setTheme] = useState<"dark" | "light">("dark");
   const [locale, setLocale] = useState<Locale>("en");
-  const [accountMenu, setAccountMenu] = useState<"sidebar" | "header" | null>(null);
   const t = (key: MessageKey) => messages[locale][key];
   const current = runs.find((r) => r.id === currentId);
   const tasks = current?.tasks ?? [];
@@ -57,27 +57,6 @@ export default function Home() {
     if (task.id === "testing") return t("testingTask");
     return task.title;
   };
-  const renderAccountMenu = () => (
-    <div className="account-dropdown" role="dialog" aria-label={t("personalWorkspace")}>
-      <div className="account-dropdown-user">{user?.email}<small>{t("personalWorkspace")}</small></div>
-      <div className="account-menu-section">
-        <span className="account-menu-label">{t("appearance")}</span>
-        <div className="account-choice-row" role="group" aria-label={t("appearance")}>
-          <button type="button" className={theme === "light" ? "account-choice selected" : "account-choice"} aria-pressed={theme === "light"} onClick={() => changeTheme("light")}><Sun size={14} />{t("light")}</button>
-          <button type="button" className={theme === "dark" ? "account-choice selected" : "account-choice"} aria-pressed={theme === "dark"} onClick={() => changeTheme("dark")}><Moon size={14} />{t("dark")}</button>
-        </div>
-      </div>
-      <div className="account-menu-section">
-        <span className="account-menu-label">{t("language")}</span>
-        <div className="account-choice-row" role="group" aria-label={t("language")}>
-          <button type="button" className={locale === "en" ? "account-choice selected" : "account-choice"} aria-pressed={locale === "en"} onClick={() => changeLocale("en")}><Globe2 size={14} />English</button>
-          <button type="button" className={locale === "es" ? "account-choice selected" : "account-choice"} aria-pressed={locale === "es"} onClick={() => changeLocale("es")}><Globe2 size={14} />Español</button>
-        </div>
-      </div>
-      <button type="button" className="account-logout" onClick={logout}><LogOut size={14} />{t("logout")}</button>
-    </div>
-  );
-
   useEffect(() => {
     const savedTheme = localStorage.getItem("crew-theme");
     const savedLocale = localStorage.getItem("crew-locale");
@@ -95,22 +74,6 @@ export default function Home() {
       .catch(() => setAuthMessage(messages[locale].networkError))
       .finally(() => setAuthReady(true));
   }, [locale]);
-
-  useEffect(() => {
-    if (!accountMenu) return;
-    const onPointerDown = (event: PointerEvent) => {
-      if (event.target instanceof Element && !event.target.closest(".account-menu-anchor")) setAccountMenu(null);
-    };
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setAccountMenu(null);
-    };
-    document.addEventListener("pointerdown", onPointerDown);
-    document.addEventListener("keydown", onKeyDown);
-    return () => {
-      document.removeEventListener("pointerdown", onPointerDown);
-      document.removeEventListener("keydown", onKeyDown);
-    };
-  }, [accountMenu]);
 
   useEffect(() => {
     if (!authReady || !user) return;
@@ -162,7 +125,6 @@ export default function Home() {
   async function logout() {
     await fetch("/api/auth/logout", { method: "POST" });
     setUser(null); setRuns([]); setCurrentId("demo");
-    setAccountMenu(null);
   }
 
   async function runTeam(text = prompt) {
@@ -218,7 +180,7 @@ export default function Home() {
     }
   }
 
-  function newRun() { setCurrentId("demo"); setPrompt(""); setMobileOpen(false); setAccountMenu(null); }
+  function newRun() { setCurrentId("demo"); setPrompt(""); setMobileOpen(false); }
   function changeTheme(nextTheme: "dark" | "light") {
     setTheme(nextTheme);
     localStorage.setItem("crew-theme", nextTheme);
@@ -283,11 +245,17 @@ export default function Home() {
         </div>
         <div className="sidebar-bottom">
           <div className="usage"><div className="usage-top"><span>{t("savedRuns")}</span><span>{runs.length}</span></div><div className="usage-track"><span style={{ width: `${Math.min(runs.length * 8, 100)}%` }} /></div></div>
-          <div className="account-menu-anchor sidebar-account">
-            <button className="profile account-trigger" type="button" aria-haspopup="dialog" aria-expanded={accountMenu === "sidebar"} onClick={() => setAccountMenu(accountMenu === "sidebar" ? null : "sidebar")}>
-              <div className="profile-avatar">{(user.email?.slice(0, 2) || "AV").toUpperCase()}</div><span>{user.email}<small>{t("personalWorkspace")}</small></span><ChevronDown size={15} />
-            </button>
-            {accountMenu === "sidebar" && renderAccountMenu()}
+          <div className="sidebar-account">
+            <AccountMenu
+              email={user.email}
+              locale={locale}
+              theme={theme}
+              trigger="sidebar"
+              t={t}
+              onThemeChange={changeTheme}
+              onLocaleChange={changeLocale}
+              onLogout={logout}
+            />
           </div>
         </div>
       </aside>
@@ -297,10 +265,16 @@ export default function Home() {
           <div className="crumb"><button className="icon-btn menu-trigger" onClick={() => setMobileOpen(true)} aria-label={t("workspace")}><Menu size={18} /></button><span>{t("workspace")}</span><span className="crumb-slash">/</span><strong>{t("activity")}</strong></div>
           <div className="top-actions">
             <span className="live-pill"><span /> {t("workspaceReady")}</span>
-            <div className="account-menu-anchor header-account">
-              <button type="button" className="top-avatar account-avatar-trigger" aria-label={user.email} aria-haspopup="dialog" aria-expanded={accountMenu === "header"} onClick={() => setAccountMenu(accountMenu === "header" ? null : "header")}>{(user.email?.slice(0, 2) || "AV").toUpperCase()}<ChevronDown size={12} /></button>
-              {accountMenu === "header" && renderAccountMenu()}
-            </div>
+            <AccountMenu
+              email={user.email}
+              locale={locale}
+              theme={theme}
+              trigger="header"
+              t={t}
+              onThemeChange={changeTheme}
+              onLocaleChange={changeLocale}
+              onLogout={logout}
+            />
           </div>
         </header>
         <div className="content">

@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import Home from "../app/page";
@@ -77,17 +77,29 @@ describe("Crew UI", () => {
     render(<Home />);
     await screen.findByRole("heading", { name: "Make work flow." });
 
-    await user.click(screen.getByRole("button", { name: "demo@example.test" }));
-    expect(await screen.findByRole("dialog", { name: "Personal workspace" })).toBeTruthy();
-    await user.click(screen.getByRole("button", { name: "Light" }));
-    expect(document.documentElement.dataset.theme).toBe("light");
-    expect(localStorage.getItem("crew-theme")).toBe("light");
+    const headerTrigger = screen.getByRole("button", { name: "demo@example.test" });
+    await user.click(headerTrigger);
+    expect(await screen.findByRole("menu")).toBeTruthy();
+    await user.hover(screen.getByRole("menuitem", { name: "Appearance" }));
+    const lightItem = await screen.findByRole("menuitem", { name: "Light" });
+    fireEvent.click(lightItem);
+    await waitFor(() => {
+      expect(document.documentElement.dataset.theme).toBe("light");
+      expect(localStorage.getItem("crew-theme")).toBe("light");
+    });
 
-    await user.click(screen.getByRole("button", { name: "Español" }));
+    if (!screen.queryByRole("menu")) {
+      await user.click(headerTrigger);
+    }
+    await user.hover(screen.getByRole("menuitem", { name: "Language" }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Español" }));
     expect(await screen.findByRole("heading", { name: "Haz que el trabajo fluya." })).toBeTruthy();
     expect(document.documentElement.lang).toBe("es");
 
-    await user.click(screen.getByRole("button", { name: "Cerrar sesión" }));
+    if (!screen.queryByRole("menu")) {
+      await user.click(headerTrigger);
+    }
+    await user.click(await screen.findByRole("menuitem", { name: "Cerrar sesión" }));
     expect(await screen.findByRole("heading", { name: "Accede a tu espacio de trabajo." })).toBeTruthy();
   });
 
@@ -105,8 +117,8 @@ describe("Crew UI", () => {
     const sidebarTrigger = container.querySelector(".sidebar-account .account-trigger");
     expect(sidebarTrigger).toBeTruthy();
     await user.click(sidebarTrigger!);
-    expect(await screen.findByRole("dialog", { name: "Personal workspace" })).toBeTruthy();
+    expect(await screen.findByRole("menu")).toBeTruthy();
     await user.keyboard("{Escape}");
-    expect(screen.queryByRole("dialog", { name: "Personal workspace" })).toBeNull();
+    await waitFor(() => expect(screen.queryByRole("menu")).toBeNull());
   });
 });
