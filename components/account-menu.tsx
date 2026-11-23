@@ -48,7 +48,6 @@ export function AccountMenu({
             aria-label={email}
           >
             {initials}
-            <ChevronDown size={13} aria-hidden="true" />
           </button>
         ) : (
           <button type="button" className="profile account-trigger">

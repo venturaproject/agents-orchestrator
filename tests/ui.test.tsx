@@ -78,6 +78,9 @@ describe("Crew UI", () => {
     await screen.findByRole("heading", { name: "Make work flow." });
 
     const headerTrigger = screen.getByRole("button", { name: "demo@example.test" });
+    expect(headerTrigger.classList.contains("account-avatar-trigger")).toBe(true);
+    expect(headerTrigger.textContent?.trim()).toBe("DE");
+    expect(headerTrigger.querySelector("svg")).toBeNull();
     await user.click(headerTrigger);
     expect(await screen.findByRole("menu")).toBeTruthy();
     await user.hover(screen.getByRole("menuitem", { name: "Appearance" }));

@@ -134,9 +134,8 @@
 .profile.account-trigger .account-trigger-chevron{flex:0 0 auto;color:#808592;transition:transform .15s ease}
 .profile.account-trigger[data-state="open"] .account-trigger-chevron{transform:rotate(180deg)}
 .profile.account-trigger .profile-avatar{flex:0 0 auto}
-.account-avatar-trigger{min-width:49px;height:31px;padding:3px 6px;border:1px solid #30313c;border-radius:8px;background:#1b1b25;color:#e6e0f1;font:600 9px "DM Mono",monospace;display:flex;align-items:center;justify-content:center;gap:5px;cursor:pointer}
-.account-avatar-trigger:hover,.account-avatar-trigger[data-state="open"]{background:#242631;border-color:#454858}
-.account-avatar-trigger svg{color:#a8a5b1}
+.account-avatar-trigger{width:38px;height:38px;padding:0;border:1px solid #39404d;border-radius:50%;background:#303a47;color:#e5edf6;font:600 10px "DM Mono",monospace;display:grid;place-items:center;cursor:pointer;transition:border-color .15s ease,box-shadow .15s ease,background .15s ease}
+.account-avatar-trigger:hover,.account-avatar-trigger[data-state="open"]{background:#3a4554;border-color:#a887ff;box-shadow:0 0 0 3px #a887ff24}
 .account-dropdown{z-index:50;min-width:190px;padding:4px;border:1px solid #30313c;border-radius:8px;background:#171920;color:#e8e9ef;box-shadow:0 10px 30px #0007;outline:none}
 .account-subdropdown{min-width:150px}
 .account-dropdown-user{display:flex;flex-direction:column;gap:3px;padding:8px 9px;outline:none}
@@ -158,7 +157,8 @@
 :root[data-theme="light"] .auth-locale.selected{background:#fff;color:#7654c5;box-shadow:0 1px 3px #1d23301c}
 :root[data-theme="light"] .remember-option{color:#555b69}
 :root[data-theme="light"] .registration-disabled{color:#777d89}
-:root[data-theme="light"] .account-avatar-trigger{border-color:#dedfe7;background:#fff;color:#343744}
+:root[data-theme="light"] .account-avatar-trigger{border-color:#d5d8e2;background:#e9edf4;color:#343744}
+:root[data-theme="light"] .account-avatar-trigger:hover,:root[data-theme="light"] .account-avatar-trigger[data-state="open"]{border-color:#8d6bd4;background:#f3efff}
 :root[data-theme="light"] .account-dropdown{border-color:#e2e4eb;background:#fff;color:#30333e;box-shadow:0 10px 30px #25305224}
 :root[data-theme="light"] .account-dropdown-email{color:#30333e}
 :root[data-theme="light"] .account-dropdown-workspace{color:#737987}
