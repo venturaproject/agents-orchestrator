@@ -27,6 +27,7 @@ npm run dev
 ```
 
 `predev` runs `npm run db:up` and `npm run db:migrate`. If you need to prepare the database without launching Next.js, run those commands individually.
+The local PostgreSQL container uses `restart: "no"`, so starting Docker Desktop will not start it automatically. `npm run dev` still starts it explicitly through `predev`.
 
 ## Useful commands
 
