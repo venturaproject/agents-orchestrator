@@ -79,7 +79,7 @@ New backend capabilities follow DDD and Clean Architecture (`Infrastructure -> A
 
 ### Prerequisites
 
-- Node.js 22.22.3 or newer (Node 24.15+ is also supported by the Nest toolchain)
+- Node.js 26.12.1 recommended for local builds and both production services. NestJS 12 also supports Node.js 22.22.3+ and 24.15+.
 - npm
 - Docker Desktop (for local PostgreSQL)
 - At least one inference key: Groq or NVIDIA NIM

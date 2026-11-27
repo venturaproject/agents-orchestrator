@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-- Node.js 22.22.3+ (or 24.15+; required by the NestJS 12 toolchain)
+- Node.js 26.12.1 recommended to match CI, Docker, and both production services. The NestJS 12 toolchain also supports Node.js 22.22.3+ or 24.15+.
 - npm
 - Docker Desktop / Docker Engine with Compose
 - A Groq API key, an NVIDIA NIM API key, or both

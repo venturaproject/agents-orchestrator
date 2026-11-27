@@ -7,15 +7,17 @@ in this guide has been executed against production as part of the migration.
 
 | Role | Domain / process |
 | --- | --- |
-| Frontend | `demo.prostiner.serv00.net`, Node.js Passenger, Next.js 16 |
-| Backend API | `api.demo.prostiner.serv00.net`, Node.js Passenger, NestJS 12 |
+| Frontend | `demo.prostiner.serv00.net`, Node.js 26.12.1 Passenger, Next.js 16 |
+| Backend API | `api.demo.prostiner.serv00.net`, Node.js 26.12.1 Passenger, NestJS 12 |
 | Database | Existing PostgreSQL database on Serv00; keep the existing `app_users` data |
 | Frontend directory | `/usr/home/prostiner/domains/demo.prostiner.serv00.net/public_nodejs` |
 | Backend directory | `/usr/home/prostiner/domains/api.demo.prostiner.serv00.net/public_nodejs` |
 | Agent workspace | A private writable directory outside both deployed source directories |
 | SSH host | `s16.serv00.com` (alias `prostiner-serv00` for local deploys) |
 
-Both sites must use Node.js 22. The API subdomain was previously provisioned as
+Both services now use Node.js 26.12.1 in Passenger. The API was changed from
+22.23.4 to 26.12.1 and restarted after the NestJS 12 build and tests passed on
+that version. CI and Docker use 26.12.1 for both apps. The API subdomain was previously provisioned as
 a proxy to reserved port `27087`; before using the Passenger deployment workflow,
 change that site to **Node.js** type and configure its entrypoint as
 `public_nodejs/app.js`. Keep the port reservation until the conversion and API
@@ -57,7 +59,7 @@ public API URL at build time; it does not receive database or provider secrets.
 
 Before the first production release:
 
-1. Confirm both domain directories exist and both sites use Node.js 22 Passenger.
+1. Confirm both domain directories exist and both sites use Node.js 26.12.1 Passenger.
 2. Reconfigure the existing API proxy site to Node.js Passenger and set its app
    directory/entrypoint to the API domain's `public_nodejs/app.js`.
 3. Confirm valid TLS for both domains and verify the API subdomain resolves.

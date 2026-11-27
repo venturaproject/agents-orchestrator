@@ -1,9 +1,9 @@
-FROM node:22-alpine AS dependencies
+FROM node:26.12.1-alpine AS dependencies
 WORKDIR /app/frontend
 COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci
 
-FROM node:22-alpine AS builder
+FROM node:26.12.1-alpine AS builder
 WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
 ARG NEXT_PUBLIC_BACKEND_URL
@@ -12,7 +12,7 @@ COPY --from=dependencies /app/frontend/node_modules ./frontend/node_modules
 COPY . .
 RUN npm --prefix frontend run build
 
-FROM node:22-alpine AS runner
+FROM node:26.12.1-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \
