@@ -9,12 +9,13 @@ coverage/
 .env
 .env.*
 !.env.example
+!.env.docker.example
 
 # Local runtime artifacts
 *.log
 .agent-workspaces/
 .playwright-mcp/
-tsconfig.tsbuildinfo
+**/tsconfig.tsbuildinfo
 
 # Local Supabase CLI state (may contain project-specific metadata)
 supabase/.temp/

@@ -1,0 +1,32 @@
+{
+  "name": "crew-backend",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "nest build",
+    "dev": "node --env-file=../.env.local node_modules/@nestjs/cli/bin/nest.js start --watch",
+    "db:migrate": "node --env-file=../.env.local scripts/migrate.mjs",
+    "db:migrate:container": "node scripts/migrate.mjs",
+    "start": "node app.js",
+    "lint": "oxlint src test",
+    "architecture:check": "depcruise src --config .dependency-cruiser.cjs",
+    "test": "npm run build && node --test test/*.test.cjs"
+  },
+  "dependencies": {
+    "@nestjs/common": "^12.6.3",
+    "@nestjs/core": "^12.6.3",
+    "@nestjs/platform-express": "^12.6.3",
+    "jose": "^6.2.18",
+    "pg": "^8.23.1",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2"
+  },
+  "devDependencies": {
+    "@nestjs/cli": "^12.0.15",
+    "@types/node": "^22.13.10",
+    "@types/pg": "^8.23.1",
+    "dependency-cruiser": "^17.3.8",
+    "oxlint": "^1.94.0",
+    "typescript": "^5.9.3"
+  }
+}

@@ -5,6 +5,7 @@ This directory contains the design and operational reference for Crew.
 | Document | Use it for |
 | --- | --- |
 | [Architecture](architecture.md) | Components, request flow, persistence, and hosting topology |
+| [Architecture conventions](architecture-conventions.md) | Frontend/backend boundaries, DDD, Clean Architecture, CQRS, testing, and migration rules |
 | [Agent workflow](agent-workflow.md) | Agent responsibilities, patch lifecycle, provider routing, and verification status |
 | [Security](security.md) | Authentication controls, trust boundaries, and known gaps |
 | [Development](development.md) | Local setup, commands, code map, and troubleshooting |

@@ -16,14 +16,14 @@ The labels describe separate prompts and responsibilities; the roles are calls t
 
 ### Planning
 
-- Orchestrator sees a list of files under `app/`, excluding API routes and `layout.tsx`.
+- Orchestrator sees a list of files under `frontend/app/`, excluding API routes and `layout.tsx`.
 - Its target paths are validated against the UI allowlist.
 - If the required target file list is missing or malformed, the planner is asked to repair the plan once.
 
 ### Patch generation and sandbox checks
 
 - Develop receives at most three target files with a bounded context size.
-- Allowed changes are `.tsx` and `.css` files under `app/`, excluding `app/api/**` and `app/layout.tsx`.
+- Allowed changes are `.tsx` and `.css` files under `app/` within the disposable workspace (sourced from `frontend/app/`), excluding `app/api/**` and `app/layout.tsx`.
 - The API permits at most two generation attempts for a malformed or disallowed patch per iteration.
 - The server checks the patch path and structure, then uses `git apply --check` and `git apply` in the temporary workspace.
 - `tsc --noEmit` compiles the copy; the generated application code is not launched.
@@ -35,7 +35,7 @@ Testing receives the actual compiler result. Approval requires both a passing Ty
 
 ## Provider routing
 
-The provider adapter is `lib/llm-provider.ts`.
+The provider adapter lives in `backend/src/infrastructure/providers/`.
 
 | Order | Provider | Default model | API |
 | --- | --- | --- | --- |

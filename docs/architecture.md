@@ -2,41 +2,52 @@
 
 ## System context
 
-Crew is a single Next.js application. The browser talks to authenticated Next.js route handlers; those handlers own PostgreSQL persistence and call external model APIs. No model provider receives database credentials or direct access to the production source tree.
+Crew is a Next.js 16 frontend and NestJS 12 backend monorepo. Business APIs,
+authentication, PostgreSQL persistence, provider integration, and agent
+orchestration belong to NestJS. The browser calls the API directly in host
+development and through the same-origin Nginx `/api/` proxy in Docker. No
+business API handlers remain in Next.js.
+
+Backend code follows the DDD, Clean Architecture, and CQRS conventions in
+[architecture-conventions.md](architecture-conventions.md).
 
 ```mermaid
 flowchart LR
     Browser[Browser / authenticated user]
-    Web[Next.js App Router]
+    Web[Next.js 16 frontend]
+    Nest[NestJS backend API]
     DB[(PostgreSQL)]
     Router[LLM provider router]
     Groq[Groq API]
     NVIDIA[NVIDIA NIM API]
     WS[Disposable workspace]
 
-    Browser -->|HTTPS, session cookie| Web
-    Web -->|parameterized queries| DB
-    Web --> Router
+    Browser -->|HTTPS, session cookie and API calls| Web
+    Web -->|same-origin /api proxy| Nest
+    Nest -->|parameterized queries| DB
+    Nest --> Router
     Router --> Groq
     Router --> NVIDIA
-    Web -->|copy, validate, apply, typecheck| WS
-    WS -. never writes to production source .-> Web
+    Nest -->|copy, validate, apply, typecheck| WS
+    WS -. never writes to production source .-> Nest
 ```
 
 ## Runtime components
 
 | Component | Responsibility |
 | --- | --- |
-| `app/page.tsx` | Authenticated workspace UI, run submission, progress refresh, result/diff presentation |
-| `app/api/agents/route.ts` | Authenticated orchestration endpoint; coordinates the run and persists progress |
-| `app/api/runs/route.ts` | Reads and upserts user-owned run history |
-| `app/api/runs/[id]/patch/route.ts` | Serves a saved patch only to the owner of that run |
-| `app/api/auth/*` | Registration, login, session inspection, and logout |
-| `lib/llm-provider.ts` | Groq/NVIDIA selection, retries, failover, and in-process circuit state |
-| `lib/agent-workspace.ts` | Creates temporary workspace copies, checks file paths, applies patches, type-checks, and cleans up |
-| `lib/db.ts` | Shared PostgreSQL connection pool |
-| `lib/session.ts` | Signed session tokens, cookie settings, and same-origin validation |
-| `migrations/` | PostgreSQL schema for users, runs, task state, and run results |
+| `frontend/app/page.tsx` | Authenticated workspace UI, run submission, progress refresh, result/diff presentation |
+| `frontend/app/` | Next.js UI and route composition; no business API routes |
+| `frontend/lib/backend-api.ts` | Same-origin or configured backend URL, credentials, and locale header |
+| `frontend/features/auth/services/session-client.ts` | Frontend session API client |
+| `backend/src/domain/` | Framework-independent auth and agent-run domain models |
+| `backend/src/application/` | Auth, run, and agent use cases with ports |
+| `backend/src/infrastructure/http/` | Controllers, cookies, CORS/origin checks, localized errors |
+| `backend/src/infrastructure/persistence/` | PostgreSQL pool and repositories |
+| `backend/src/infrastructure/agents/` | Workspace adapter and isolated patch operations |
+| `backend/src/infrastructure/providers/` | Groq/NVIDIA routing, retries, failover, circuit state |
+| `backend/src/` | NestJS 12 API and `/api/health` |
+| `backend/migrations/` | PostgreSQL schema owned by the backend |
 
 ## Agent run sequence
 
@@ -81,11 +92,19 @@ flowchart TB
     User[User browser] -->|HTTPS| Serv00[Serv00 Node.js / Passenger]
     Serv00 -->|private network connection| PG[(Serv00 PostgreSQL)]
     Serv00 -->|HTTPS, server-side key| Providers[Groq and NVIDIA NIM]
-    Dev[Developer machine] -->|build + rsync, excludes env files| Serv00
-    Dev -->|local Docker only| LocalPG[(PostgreSQL 16)]
+    Dev[Developer machine] -->|manual GitHub Actions deploy| Serv00
+    Dev -->|Nginx :8088| LocalApp[Next.js 16 frontend]
+    LocalApp -->|/api/ proxy| LocalNest[NestJS 12 backend]
+    Dev -->|Docker Compose| LocalPG[(PostgreSQL 16 container)]
+    LocalNest --> LocalPG
 ```
 
-The production deployment is a single Serv00 Node.js application using Passenger. The database is a separate Serv00 PostgreSQL service. Local development uses Docker PostgreSQL because direct SSH port forwarding from the development machine is unavailable in this setup.
+Production migration has not been executed. The planned topology uses the existing
+Serv00 frontend domain for Next.js and `api.demo.prostiner.serv00.net` for a
+separate NestJS Passenger application; the frontend calls the API over HTTPS.
+Before deployment, the API subdomain currently configured as a TCP proxy must be
+reconfigured as a Node.js Passenger site. Local Compose runs PostgreSQL,
+Next.js, NestJS, and Nginx; only Nginx publishes port `8088`.
 
 ## Important boundaries
 

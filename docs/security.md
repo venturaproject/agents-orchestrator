@@ -21,19 +21,23 @@ This document describes the current controls and the remaining risks. It is not 
 - State-changing auth and run APIs require a same-origin request.
 - Run IDs are validated and database queries use parameterized values.
 - Run reads, status updates, and patch downloads require session ownership.
+- NestJS verifies the existing `crew_session` HS256 token using `AUTH_SECRET`.
+  Credentialed CORS and state-changing origin checks use explicit
+  `FRONTEND_ORIGIN` values. Production must use the frontend HTTPS origin and a
+  parent cookie domain shared with the API subdomain.
 
 ## Agent patch boundary
 
 The runtime workflow is intentionally not a general-purpose shell agent:
 
 - It accepts a run ID associated with the authenticated user; it does not accept a local path.
-- Orchestrator selects limited UI paths under `app/`.
+- Orchestrator selects limited UI paths under `frontend/app/`.
 - Patch validation allows only TSX/CSS UI files and rejects API routes, layout, traversal, mode changes, renames, and binary patches.
 - Patches are checked and applied only inside a copied workspace.
 - The workflow invokes Git and the TypeScript compiler; it does not start the generated application.
 - The generated diff is returned to the user for review and is not automatically deployed.
 
-The workspace is **not** an OS-level sandbox. It shares the host's Node.js runtime and dependencies. Do not treat it as safe for arbitrary untrusted code execution or broaden the patch/command permissions without a stronger isolation design (for example, a restricted container or disposable VM).
+The workspace is **not** an OS-level sandbox. It shares the application's Node.js runtime and dependencies (inside the app container when using Docker). Do not treat it as safe for arbitrary untrusted code execution or broaden the patch/command permissions without a stronger isolation design (for example, a restricted container or disposable VM).
 
 ## Provider keys and deployment secrets
 

@@ -1,0 +1,98 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: crew-postgres-local
+    restart: "no"
+    environment:
+      POSTGRES_USER: ${LOCAL_PG_USER:-crew_local}
+      POSTGRES_PASSWORD: ${LOCAL_PG_PASSWORD:?Set LOCAL_PG_PASSWORD in .env.docker}
+      POSTGRES_DB: ${LOCAL_PG_DATABASE:-crew_local}
+    ports:
+      - "127.0.0.1:${LOCAL_PG_PORT:-55433}:5432"
+    volumes:
+      - crew-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${LOCAL_PG_USER:-crew_local} -d ${LOCAL_PG_DATABASE:-crew_local}"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  frontend:
+    build:
+      context: .
+      dockerfile: infrastructure/frontend/Dockerfile
+      args:
+        NEXT_PUBLIC_BACKEND_URL: ${NEXT_PUBLIC_BACKEND_URL:-}
+    restart: "no"
+    init: true
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+    expose:
+      - "3000"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: ../infrastructure/backend/Dockerfile
+    restart: "no"
+    init: true
+    env_file:
+      - .env.docker
+    environment:
+      NODE_ENV: production
+      PORT: "3001"
+      HOST: 0.0.0.0
+      AUTH_SECRET: ${AUTH_SECRET:?Set AUTH_SECRET in .env.docker}
+      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL to use postgres as the host in .env.docker}
+      FRONTEND_ORIGIN: http://localhost:${APP_PORT:-8088},http://127.0.0.1:${APP_PORT:-8088}
+      FRONTEND_APP_ROOT: /app/frontend
+      AGENT_WORKSPACE_ROOT: /app/.agent-workspaces
+    expose:
+      - "3001"
+    volumes:
+      - ./frontend:/app/frontend:ro
+      - crew-agent-workspaces:/app/.agent-workspaces
+    depends_on:
+      postgres:
+        condition: service_healthy
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+  nginx:
+    image: nginx:1.27-alpine
+    restart: "no"
+    ports:
+      - "127.0.0.1:${APP_PORT:-8088}:80"
+    volumes:
+      - ./infrastructure/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - frontend
+      - backend
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+      - CHOWN
+      - SETUID
+      - SETGID
+
+networks:
+  default:
+    name: crew-local
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.16.240.0/24
+
+volumes:
+  crew-postgres-data:
+  crew-agent-workspaces:

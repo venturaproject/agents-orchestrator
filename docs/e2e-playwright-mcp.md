@@ -4,7 +4,7 @@ This guide describes a repeatable, human-operated browser acceptance pass using 
 
 ## Safety and setup
 
-1. Prefer local development at `http://localhost:3000` with the local Docker database.
+1. Prefer the integrated local stack at `http://localhost:8088` with the local Docker database.
 2. Do not run generated-patch scenarios against production unless explicitly authorized. They call paid/rate-limited model APIs and create persistent run records.
 3. Use a dedicated local test account. Public registration is intentionally disabled in the demo.
 4. Do not include passwords, session cookies, API keys, or secret-bearing DevTools screenshots in MCP artifacts or reports.
@@ -13,10 +13,11 @@ This guide describes a repeatable, human-operated browser acceptance pass using 
 Start the local stack:
 
 ```bash
-npm run dev
+make docker-up
 ```
 
-The `predev` hook starts local PostgreSQL and applies migrations.
+Nginx serves the complete application at `http://localhost:8088`, including the
+same-origin proxy to NestJS.
 
 ## Playwright MCP interaction loop
 
@@ -24,7 +25,7 @@ Use the MCP's browser navigation, snapshot, click, fill, and evaluate tools. Cap
 
 Example tool sequence (tool names may vary slightly by MCP host):
 
-1. Navigate to `http://localhost:3000`.
+1. Navigate to `http://localhost:8088`.
 2. Capture the accessibility snapshot.
 3. Interact by accessible role/name rather than brittle CSS selectors.
 4. Capture the post-action snapshot and assert visible state.
@@ -73,7 +74,7 @@ Run this only when an end-to-end model call is appropriate:
 
 - [ ] Submit a small, bounded UI-only request in the currently selected language.
 - [ ] Confirm Orchestrator, Develop, and Testing progress updates appear.
-- [ ] Confirm the resulting patch only contains allowed `app/**/*.tsx` or `app/**/*.css` paths.
+- [ ] Confirm the resulting patch only contains allowed `app/**/*.tsx` or `app/**/*.css` paths in the temporary workspace (sourced from `frontend/app/`).
 - [ ] Confirm Testing output distinguishes the real TypeScript result from the model review.
 - [ ] Confirm failed provider calls or invalid patches are shown as failures, not falsely reported as approved.
 - [ ] If Testing rejects the change, observe a feedback round; do not expect more than three rounds.

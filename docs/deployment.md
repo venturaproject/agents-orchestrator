@@ -1,92 +1,141 @@
 # Serv00 Deployment
 
-## Production topology
+Production deployment is deliberately separate from local verification. Nothing
+in this guide has been executed against production as part of the migration.
 
-- Domain: `demo.prostiner.serv00.net`
-- Runtime: Node.js application managed by Passenger
-- Entrypoint: `app.js`
-- Database: PostgreSQL hosted by Serv00
-- TLS: Let's Encrypt certificate managed through Serv00
-- Remote app directory: `/usr/home/prostiner/domains/demo.prostiner.serv00.net/public_nodejs`
-- Workspace root: `/usr/home/prostiner/domains/demo.prostiner.serv00.net/agent-workspaces`
-- SSH alias used by scripts: `prostiner-serv00`
+## Target topology
 
-No credential values belong in this document or in the repository.
+| Role | Domain / process |
+| --- | --- |
+| Frontend | `demo.prostiner.serv00.net`, Node.js Passenger, Next.js 16 |
+| Backend API | `api.demo.prostiner.serv00.net`, Node.js Passenger, NestJS 12 |
+| Database | Existing PostgreSQL database on Serv00; keep the existing `app_users` data |
+| Frontend directory | `/usr/home/prostiner/domains/demo.prostiner.serv00.net/public_nodejs` |
+| Backend directory | `/usr/home/prostiner/domains/api.demo.prostiner.serv00.net/public_nodejs` |
+| Agent workspace | A private writable directory outside both deployed source directories |
+| SSH host | `s16.serv00.com` (alias `prostiner-serv00` for local deploys) |
 
-## Required production environment
+Both sites must use Node.js 22. The API subdomain was previously provisioned as
+a proxy to reserved port `27087`; before using the Passenger deployment workflow,
+change that site to **Node.js** type and configure its entrypoint as
+`public_nodejs/app.js`. Keep the port reservation until the conversion and API
+health check are complete; this repository does not change Serv00 configuration.
+The frontend site's Passenger entrypoint is `public_nodejs/app.js`.
 
-The remote `.env.production` must contain:
+The browser calls the API at `https://api.demo.prostiner.serv00.net`. Cookies
+must be shared by both subdomains using `SESSION_COOKIE_DOMAIN=.prostiner.serv00.net`.
+Nest CORS and state-changing origin validation must allow exactly
+`https://demo.prostiner.serv00.net`.
+
+## Backend environment
+
+Provision a separate `.env.production` inside the API site's `public_nodejs`
+directory. Restrict it to the application account (`chmod 600`). It is not
+committed or copied from this repository:
 
 ```dotenv
 NODE_ENV=production
 DATABASE_URL=postgresql://...
-AUTH_SECRET=<unique production secret, at least 32 characters>
+AUTH_SECRET=<unique secret of at least 32 characters>
+FRONTEND_ORIGIN=https://demo.prostiner.serv00.net
+SESSION_COOKIE_DOMAIN=.prostiner.serv00.net
+FRONTEND_APP_ROOT=/usr/home/prostiner/domains/demo.prostiner.serv00.net/public_nodejs
+AGENT_WORKSPACE_ROOT=/usr/home/prostiner/domains/demo.prostiner.serv00.net/agent-workspaces
 GROQ_API_KEY=<optional if NVIDIA is configured>
 GROQ_MODEL=openai/gpt-oss-20b
 NVIDIA_API_KEY=<optional if Groq is configured>
 NVIDIA_MODEL=nvidia/nemotron-3-nano-omni-30b-a3b-reasoning
-AGENT_WORKSPACE_ROOT=/usr/home/prostiner/domains/demo.prostiner.serv00.net/agent-workspaces
 ```
 
-At least one provider key is required. Set file permissions to `600` and the containing workspace directory to be accessible only to the app account.
+At least one provider key is required for agent execution. Use the same existing
+`DATABASE_URL` and `AUTH_SECRET` contract as the current account/session data.
+The deploy process never prints or uploads these values. The backend Passenger
+entrypoint loads this file before Nest starts. The frontend receives only the
+public API URL at build time; it does not receive database or provider secrets.
+
+## Pre-deploy checklist
+
+Before the first production release:
+
+1. Confirm both domain directories exist and both sites use Node.js 22 Passenger.
+2. Reconfigure the existing API proxy site to Node.js Passenger and set its app
+   directory/entrypoint to the API domain's `public_nodejs/app.js`.
+3. Confirm valid TLS for both domains and verify the API subdomain resolves.
+4. Move server-only values from the previous frontend deployment environment into
+   the API site's `.env.production` using a server-side secure procedure. Preserve
+   a protected backup first; do not print or copy values to a workstation. Remove
+   database/provider/session secrets and workspace paths from the frontend
+   `.env.production` and Passenger environment so the UI process no longer receives
+   backend credentials.
+5. Provision the backend `.env.production` above with restrictive permissions.
+6. Confirm `FRONTEND_APP_ROOT` and `AGENT_WORKSPACE_ROOT` exist and are writable
+   only where required. The backend needs read access to the frontend and write
+   access only to the workspace directory.
+7. Take a database backup using the approved Serv00 procedure. The deployment
+   does not recreate users or replace the database.
+8. Confirm the production schema already contains the current idempotent
+   migrations. The deploy script deliberately does not run migrations.
+9. Configure the GitHub Actions secrets listed below, or use the local SSH
+   alias. Validate the Serv00 SSH host fingerprint through a trusted channel.
+
+The migration leaves the SQL model and existing `app_users` rows intact; no schema
+migration is needed for the frontend/backend split.
 
 ## Deploy
 
-The deploy script (`scripts/deploy-serv00.sh`):
-
-1. Confirms that the remote `.env.production` exists.
-2. Builds locally with `npm run build`.
-3. Syncs the application using `rsync`, excluding `.env*`, `.git`, `node_modules`, and local-only directories.
-4. Runs `npm ci --omit=dev` remotely.
-5. Restarts the Serv00 Node.js application with `devil www restart`.
-
-Run:
+The deploy command builds and verifies both applications, syncs frontend and
+backend to their separate Passenger directories, installs production
+dependencies, restarts the backend, checks `/api/health`, and only then restarts
+the frontend:
 
 ```bash
-npm run deploy:serv00
+make deploy
 ```
 
-The deployment script does not provision secrets and does not apply the SQL migrations to production. Apply required migrations using the approved database access procedure before deploying code that depends on them.
+For a local deploy, `prostiner-serv00` must be configured in SSH. The optional
+environment variables `SERV00_SSH_TARGET`, `SERV00_SSH_KEY_FILE`,
+`SERV00_FRONTEND_DOMAIN`, and `SERV00_BACKEND_DOMAIN` can override the defaults.
+The workflow builds the frontend with
+`NEXT_PUBLIC_BACKEND_URL=https://api.demo.prostiner.serv00.net`.
+
+The script requires the backend environment file and checks that required
+variables are present without printing their values. It never runs a production
+migration, deletes the existing database, or syncs `.env*` files. If the API
+health check fails, it does not restart the frontend.
 
 ## GitHub Actions deployment
 
-The repository includes:
+- `CI` runs lint/type checks, architecture checks, tests, and both builds on pull
+  requests and pushes to `main`.
+- `Deploy production` is manual (`workflow_dispatch`), only deploys `main`, and
+  repeats verification before invoking the same dual-service deploy script.
+- Required Actions secrets: `SERV00_SSH_PRIVATE_KEY` and verified
+  `SERV00_KNOWN_HOSTS`. The workflow uses the `production` environment; configure
+  required reviewers there if an approval gate is desired.
+- The workflow does not provision domains, TLS, environment files, or database
+  backups. It does not deploy pull requests or run on every push.
 
-- `CI` — runs lint/type-check, Vitest, and the production build for pull requests and pushes to `main`.
-- `Deploy production` — manually deploys the selected `main` revision after the same checks pass. It does not deploy pull requests or run on every push.
-
-The deployment workflow uses GitHub-hosted Ubuntu runners and does not perform `git pull` on Serv00. It builds a fresh artifact, syncs source/build output while excluding `.env*` and local state, installs production dependencies remotely, then restarts Passenger. It never prints or transfers the remote `.env.production`.
-
-### Configure deployment credentials
-
-Create a dedicated SSH key for GitHub Actions rather than reusing a personal SSH key. The private key belongs in GitHub Actions secrets only; install the matching public key in the Serv00 account's `~/.ssh/authorized_keys`.
-
-Add these repository secrets under **Settings → Secrets and variables → Actions** (preferably scoped to the `production` environment):
-
-| Secret | Value |
-| --- | --- |
-| `SERV00_SSH_PRIVATE_KEY` | Dedicated deploy private key, including its PEM/OpenSSH header and footer |
-| `SERV00_KNOWN_HOSTS` | Verified `known_hosts` entry for `s16.serv00.com` |
-
-Verify the SSH host fingerprint against Serv00's trusted documentation or support before adding it. Do not use `ssh-keyscan` output without validating the fingerprint out of band. The workflow currently targets the Serv00 account and application directory shown in the production topology above.
-
-Then run **Actions → Deploy production → Run workflow**, selecting `main`. To add a human approval gate, configure required reviewers for the `production` environment in the repository settings. Keep deployment manual until the workflow has been validated; only then consider automatic deployment after protected merges to `main`.
-
-The workflow intentionally does not run migrations. Any future schema migration must be applied through the approved production database procedure before deploying dependent code.
+Do not run this workflow until every pre-deploy item is verified and a production
+deployment is explicitly authorized.
 
 ## Database migrations
 
-Migrations are idempotent SQL files in `migrations/`. `scripts/migrate.mjs` applies the ordered list for local development. The current production schema includes:
+Forward-only, idempotent migrations live in `backend/migrations/` and are applied
+by `backend/scripts/migrate.mjs`. The current schema is:
 
 - `001_initial.sql` — `app_users`, `agent_runs`, ownership index
 - `002_agent_results.sql` — persisted JSONB `result`
 
-For future migrations, add the new SQL filename to the runner and run it against production before the dependent deployment. Do not edit an already-applied migration.
+Apply any future production migration through the approved database procedure
+before deploying code that depends on it. Never edit a migration already applied
+to production.
 
-## Operational notes
+## Operational limitations
 
-- Local development uses Docker PostgreSQL; direct SSH port forwarding to the hosted database is blocked in this environment.
-- The deployed application connects to PostgreSQL from Serv00.
-- `.env.production` is not part of the synced application payload.
-- Each agent run creates a temporary workspace and attempts cleanup in a `finally` block. After an abrupt process termination, inspect and clean stale run directories deliberately.
-- There is no automated rollback mechanism in the deploy script. Preserve a known-good deployment artifact or backup before production changes.
+- No automatic rollback is implemented. Preserve a known-good release/backup
+  before deployment.
+- Each agent run creates a temporary workspace and attempts cleanup in `finally`;
+  abrupt termination can leave stale directories.
+- Agent orchestration and provider failover run in-process; there is no durable
+  queue or distributed circuit breaker.
+- Direct SSH database port forwarding is unavailable in the current environment.

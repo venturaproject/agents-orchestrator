@@ -2,13 +2,20 @@
 
 These short records capture the choices that shape the current prototype.
 
-## ADR 001 — Next.js App Router
+## ADR 001 — Next.js UI and NestJS API
 
-**Decision:** Use one Next.js application for UI and server routes.
+**Decision:** Use Next.js 16 for the UI and NestJS 12 for business APIs, with a
+browser-facing HTTP contract between them.
 
-**Why:** The assignment needs an observable web interface and a server-side agent workflow. A single deployment keeps authentication, run history, and UI progress updates in one application.
+**Why:** Authentication, persistence, and agent orchestration have independent
+business responsibilities and should not be coupled to the UI runtime. Local
+Docker routes same-origin `/api/` traffic through Nginx; production uses a
+dedicated HTTPS API subdomain.
 
-**Trade-off:** Long-running inference calls share the web request lifecycle. A durable queue/worker may be needed as usage grows.
+**Trade-off:** Production runs two Node.js applications and must keep the shared
+session contract, CORS/origin allowlist, and cookie domain configured consistently.
+Long-running inference still uses the request lifecycle; a durable queue/worker
+may be needed as usage grows.
 
 ## ADR 002 — PostgreSQL on Serv00
 
@@ -16,7 +23,8 @@ These short records capture the choices that shape the current prototype.
 
 **Why:** Persistent user/run data is required, PostgreSQL is available on the selected host, and the same SQL model can be exercised locally.
 
-**Trade-off:** There is no migration framework with a migration ledger; migrations are explicitly ordered and idempotent in `scripts/migrate.mjs`.
+**Trade-off:** There is no migration framework with a migration ledger; migrations
+are explicitly ordered and idempotent in `backend/scripts/migrate.mjs`.
 
 ## ADR 003 — Review-only patches in isolated copies
 
