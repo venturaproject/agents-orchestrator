@@ -17,6 +17,7 @@ The labels describe separate prompts and responsibilities; the roles are calls t
 ### Planning
 
 - Orchestrator sees a list of files under `frontend/app/`, excluding API routes and `layout.tsx`.
+- Planning, implementation, and review requests use provider JSON mode. Develop returns a JSON `patch` string; the application validates its structure and target paths before invoking `git apply`.
 - Its target paths are validated against the UI allowlist.
 - If the required target file list is missing or malformed, the planner is asked to repair the plan once.
 
@@ -47,14 +48,14 @@ Both providers use OpenAI-compatible Chat Completions payloads. For the NVIDIA N
 ### Failover and circuit breaker
 
 1. A configured Groq key makes Groq the primary; NVIDIA is optional. NVIDIA alone is supported if Groq is not configured.
-2. HTTP errors, timeouts, network failures, or empty model responses count as provider failures.
+2. HTTP errors, timeouts, network failures, empty model responses, or malformed structured outputs count as provider failures.
 3. A failed primary request falls back to the next configured provider for that same agent call.
 4. After two consecutive failures for a provider in the current Node.js process, its circuit opens for 60 seconds.
 5. While Groq's circuit is open, NVIDIA is tried first. Once the interval expires, the next request probes Groq again.
 6. A successful request resets that provider's failure counter and circuit state.
 7. HTTP 429 responses are retried up to two times using the provider's suggested delay when available; after that, failover is attempted.
 
-Circuit state is in memory, so each Serv00 process has its own breaker. It is not a distributed rate limiter. Logs identify provider failure and fallback transitions but must never include API keys or prompt contents.
+Circuit state is in memory, so each Serv00 process has its own breaker. It is not a distributed rate limiter. Logs identify provider, sanitized failure category, and fallback transitions but never include provider response bodies, API keys, or prompt contents.
 
 ## Trust and human review
 
@@ -79,4 +80,4 @@ Not yet verified as a repeatable acceptance test:
 - Runtime behavior or visual quality of a generated patch.
 - Multi-process circuit-breaker behavior.
 
-Previous live smoke runs encountered rate limits and malformed/out-of-scope model diffs. The workflow persists errors and rejects unsafe diffs, but those safeguards do not guarantee generated output quality.
+Previous live smoke runs encountered rate limits and malformed/out-of-scope model diffs. Structured JSON mode and strict response validation reduce format failures; provider-specific live acceptance still needs to be rerun after release. The workflow persists errors and rejects unsafe diffs, but those safeguards do not guarantee generated output quality.

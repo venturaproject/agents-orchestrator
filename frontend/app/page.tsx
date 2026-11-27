@@ -6,10 +6,12 @@ import {
   Activity, ArrowDown, ArrowUpRight, Bot, Check, CheckCheck, ChevronDown, Circle,
   Code2, Command, Eye, EyeOff, FlaskConical, GitBranch, Layers3,
   LoaderCircle, Menu, Plus, Sparkles,
-  Workflow, X, ChevronRight,
+  Workflow, X,
 } from "lucide-react";
 import { messages, type Locale, type MessageKey } from "@/lib/translations";
 import { AccountMenu } from "@/components/account-menu";
+import { RunsHistory } from "@/features/runs/components/runs-history";
+import { ReviewableDiff } from "@/features/runs/components/reviewable-diff";
 import { fetchCurrentSession } from "@/features/auth/services/session-client";
 import { backendApiUrl, backendFetch } from "@/lib/backend-api";
 
@@ -140,7 +142,7 @@ export default function Home() {
     if (!value || busy) return;
     const id = crypto.randomUUID();
     const initial: Run = {
-      id, prompt: value, createdAt: timeNow(), status: "En curso",
+      id, prompt: value, createdAt: new Date().toISOString(), status: "En curso",
       result: {},
       tasks: [
         { id: "orchestrator", title: t("orchestratorTask"), agent: "Orchestrator", status: "active", detail: t("waitingForOrchestrator"), time: timeNow() },
@@ -178,9 +180,30 @@ export default function Home() {
     } catch (error) {
       const message = error instanceof Error ? error.message : t("networkError");
       setAuthMessage(message);
-      const failed: Run = { ...initial, status: "Fallida", tasks: initial.tasks.map((task) => task.id === "orchestrator" ? task : { ...task, status: "failed", detail: message, time: timeNow() }) };
-      setRuns((old) => old.map((run) => run.id === id ? failed : run));
-      await saveRun(failed);
+      let persistedRun: Run | undefined;
+      try {
+        const latestResponse = await backendFetch("runs");
+        if (latestResponse.ok) {
+          const latest = await latestResponse.json();
+          persistedRun = (latest.runs as Run[]).find((run) => run.id === id);
+        }
+      } catch {
+        // Preserve the client-side fallback if the backend cannot be reached.
+      }
+      if (persistedRun) {
+        setRuns((old) => old.map((run) => run.id === id ? persistedRun! : run));
+      } else {
+        const failed: Run = {
+          ...initial,
+          status: "Fallida",
+          result: { error: message },
+          tasks: initial.tasks.map((task) => task.id === "orchestrator"
+            ? { ...task, status: "failed", detail: message, time: timeNow() }
+            : { ...task, status: "failed", detail: message, time: timeNow() }),
+        };
+        setRuns((old) => old.map((run) => run.id === id ? failed : run));
+        await saveRun(failed);
+      }
     } finally {
       polling = false;
       await poller;
@@ -297,41 +320,7 @@ export default function Home() {
         </header>
         <div className="content">
           {activeView === "runs" ? (
-            <section aria-labelledby="runs-heading">
-              <div className="page-heading">
-                <div>
-                  <div className="eyebrow"><span className="eyebrow-line" /> {t("workspace").toUpperCase()}</div>
-                  <h1 id="runs-heading">{t("agentRuns")}</h1>
-                  <p>{t("runsDescription")}</p>
-                </div>
-                <button className="new-run-btn" type="button" onClick={newRun}><Plus size={16} /> {t("newRun")}</button>
-              </div>
-              {runs.length === 0 ? (
-                <div className="empty-runs">
-                  <p>{t("noRuns")}</p>
-                  <button className="new-run-btn" type="button" onClick={newRun}><Plus size={16} /> {t("newRun")}</button>
-                </div>
-              ) : (
-                <div className="runs-list">
-                  {runs.map((run) => (
-                    <button
-                      key={run.id}
-                      type="button"
-                      className="run-card"
-                      onClick={() => openRun(run.id)}
-                    >
-                      <span className={`history-dot ${["Completado", "Completed"].includes(run.status) ? "green-dot" : "yellow-dot"}`} />
-                      <span className="run-card-copy">
-                        <strong>{run.prompt}</strong>
-                        <small>{run.tasks.length} {t("tasksCount")}</small>
-                      </span>
-                      <span className={`run-card-status ${run.status.toLowerCase().replaceAll(" ", "-")}`}>{statusLabel(run.status)}</span>
-                      <ChevronRight size={16} aria-hidden="true" />
-                    </button>
-                  ))}
-                </div>
-              )}
-            </section>
+            <RunsHistory runs={runs} locale={locale} t={t} statusLabel={statusLabel} onOpen={openRun} onNew={newRun} />
           ) : (
             <>
           <div className="page-heading"><div><div className="eyebrow"><span className="eyebrow-line" /> {t("aiTeam")}</div><h1>{t("headingStart")} <span>{t("headingAccent")}</span></h1><p>{t("headingDescription")}</p></div><button className="new-run-btn" onClick={newRun}><Plus size={16} /> {t("newRun")} <span className="shortcut">⌘ K</span></button></div>
@@ -365,7 +354,7 @@ export default function Home() {
             {current.result.plan?.length ? <ul className="result-plan">{current.result.plan.map((item, i) => <li key={`${i}-${item}`}>{item}</li>)}</ul> : null}
             {current.result.review && <p className="result-review">{current.result.review}</p>}
             {current.result.testOutput && <details className="result-tests"><summary>{t("testingResult")} · {current.result.iterations ?? 1} {(current.result.iterations ?? 1) === 1 ? t("round") : t("rounds")}</summary><pre>{current.result.testOutput}</pre></details>}
-            <details className="result-diff"><summary>{t("viewChanges")} ({current.result.changedFiles?.length ?? 0})</summary><pre>{current.result.diff}</pre></details>
+            <ReviewableDiff diff={current.result.diff} changedFiles={current.result.changedFiles ?? []} t={t} />
           </section>}
           <div className="composer-wrap"><div className="composer"><div className="composer-spark"><Sparkles size={16} /></div><textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); runTeam(); } }} placeholder={t("composerPlaceholder")} rows={1} /><button className="attach-btn" title={t("addContext")}><Plus size={17} /></button><button className="send-btn" disabled={!prompt.trim() || busy} onClick={() => runTeam()} aria-label={t("sendRequest")}>{busy ? <LoaderCircle size={16} className="spin" /> : <ArrowUpRight size={17} />}</button></div><div className="composer-hint"><span><Command size={11} /> {t("enterToSend")} <span className="hint-divider">·</span> {t("shiftEnterNewLine")}</span><span><span className="hint-green" /> {t("agentsReady")}</span></div></div>
             </>

@@ -85,8 +85,8 @@ migration is needed for the frontend/backend split.
 
 The deploy command builds and verifies both applications, syncs frontend and
 backend to their separate Passenger directories, installs production
-dependencies, restarts the backend, checks `/api/health`, and only then restarts
-the frontend:
+dependencies, restarts the backend, checks `/api/health`, then restarts the
+frontend and performs an HTTP smoke check on `/`:
 
 ```bash
 make deploy
@@ -101,7 +101,8 @@ The workflow builds the frontend with
 The script requires the backend environment file and checks that required
 variables are present without printing their values. It never runs a production
 migration, deletes the existing database, or syncs `.env*` files. If the API
-health check fails, it does not restart the frontend.
+health check fails, it does not restart the frontend; if the frontend smoke check
+fails, the deployment exits non-zero for operator follow-up.
 
 ## GitHub Actions deployment
 

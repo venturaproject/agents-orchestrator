@@ -18,7 +18,9 @@ test("workspace copies UI context into the configured disposable directory", asy
   try {
     const { directory } = await createWorkspace(randomUUID());
     const component = await readFile(path.join(directory, "components/account-menu.tsx"), "utf8");
+    const featureService = await readFile(path.join(directory, "features/auth/services/session-client.ts"), "utf8");
     assert.match(component, /DropdownMenu\.Root/);
+    assert.match(featureService, /backendFetch/);
   } finally {
     if (previousRoot === undefined) delete process.env.AGENT_WORKSPACE_ROOT;
     else process.env.AGENT_WORKSPACE_ROOT = previousRoot;
@@ -57,4 +59,5 @@ test("patch validation requires the exact approved path and rejects duplicate/un
 test("normalizes a unified diff without git headers", () => {
   const diff = "--- a/app/page.tsx\n+++ b/app/page.tsx\n@@ -1 +1 @@\n-old\n+new\n";
   assert.match(normalizePatch(diff), /diff --git a\/app\/page\.tsx b\/app\/page\.tsx/);
+  assert.ok(normalizePatch(diff).endsWith("\n"));
 });

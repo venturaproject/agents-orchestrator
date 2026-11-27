@@ -16,6 +16,7 @@ type Task = {
   time: string;
 };
 type Plan = { summary: string; tasks: string[]; files: string[] };
+type PatchResponse = { patch: string };
 type Review = { passed: boolean; feedback: string[]; summary: string };
 
 const maxIterations = 3;
@@ -26,6 +27,41 @@ function parseObject<T>(text: string): T {
   const end = text.lastIndexOf("}");
   if (start < 0 || end <= start) throw new Error("Agent response did not contain valid JSON.");
   return JSON.parse(text.slice(start, end + 1)) as T;
+}
+
+function parsePlan(text: string): Plan {
+  const value = parseObject<Partial<Plan>>(text);
+  if (
+    typeof value.summary !== "string" ||
+    !Array.isArray(value.tasks) ||
+    !value.tasks.every((task) => typeof task === "string") ||
+    !Array.isArray(value.files) ||
+    !value.files.every((file) => typeof file === "string")
+  ) {
+    throw new Error("Orchestrator returned an invalid structured plan.");
+  }
+  return value as Plan;
+}
+
+function parsePatchResponse(text: string): string {
+  const value = parseObject<Partial<PatchResponse>>(text);
+  if (typeof value.patch !== "string" || !value.patch.trim()) {
+    throw new Error("Develop returned an invalid structured patch.");
+  }
+  return value.patch;
+}
+
+function parseReview(text: string): Review {
+  const value = parseObject<Partial<Review>>(text);
+  if (
+    typeof value.passed !== "boolean" ||
+    typeof value.summary !== "string" ||
+    (value.feedback !== undefined &&
+      (!Array.isArray(value.feedback) || !value.feedback.every((item) => typeof item === "string")))
+  ) {
+    throw new Error("Testing returned an invalid structured review.");
+  }
+  return { ...value, feedback: value.feedback ?? [] } as Review;
 }
 
 export class ExecuteAgentWorkflowHandler {
@@ -81,9 +117,10 @@ export class ExecuteAgentWorkflowHandler {
         text.planningPrompt,
         `${text.userRequest}\n${run.prompt}\n\n${text.availableFiles}\n${fileList.join("\n")}`,
         1000,
+        "json",
       );
-      const plan = parseObject<Plan>(planText);
-      if (!plan.summary || !Array.isArray(plan.tasks) || plan.tasks.length < 1) {
+      const plan = parsePlan(planText);
+      if (!plan.summary.trim() || plan.tasks.length < 1 || plan.files.length < 1) {
         throw new Error(text.malformedPlan);
       }
       plan.tasks = plan.tasks.slice(0, 4).map((task) => String(task).slice(0, 180));
@@ -96,10 +133,11 @@ export class ExecuteAgentWorkflowHandler {
           text.repairPrompt,
           `${text.requirements} ${run.prompt}\n${text.previousPlan} ${plan.tasks.join("; ")}\n${text.repairPlan}`,
           800,
+          "json",
         );
-        const retryPlan = parseObject<Plan>(retryText);
-        if (retryPlan.summary) plan.summary = retryPlan.summary.slice(0, 400);
-        if (Array.isArray(retryPlan.tasks) && retryPlan.tasks.length) {
+        const retryPlan = parsePlan(retryText);
+        if (retryPlan.summary.trim()) plan.summary = retryPlan.summary.slice(0, 400);
+        if (retryPlan.tasks.length) {
           plan.tasks = retryPlan.tasks.slice(0, 4).map((task) => String(task).slice(0, 180));
         }
         targetFiles = this.workspaceAdapter.validateTargets(retryPlan.files);
@@ -137,9 +175,10 @@ export class ExecuteAgentWorkflowHandler {
             const developText = await this.languageModel.complete(
               text.developPrompt,
               `${text.originalRequest}\n${run.prompt}\n\n${text.plan}\n${plan.tasks.map((task, index) => `${index + 1}. ${task}`).join("\n")}\n\n${text.allowedFiles} ${targetFiles.join(", ")}\n\n${text.targetContext}\n${context}\n\n${patchError ? `${text.previousPatchRejected}: ${patchError}.` : feedback ? `${text.previousReviewFeedback}\n${feedback}` : text.implementPlan}`,
-              3000,
+              5000,
+              "json",
             );
-            const patch = this.workspaceAdapter.normalizePatch(developText);
+            const patch = this.workspaceAdapter.normalizePatch(parsePatchResponse(developText));
             changedFiles = this.workspaceAdapter.validatePatch(patch, targetFiles);
             await this.workspaceAdapter.applyPatch(workspace, patch);
             patchError = "";
@@ -162,8 +201,9 @@ export class ExecuteAgentWorkflowHandler {
           text.reviewPrompt,
           `${text.reviewRequest}\n${run.prompt}\n\n${text.plan}\n${plan.tasks.join("\n")}\n\n${text.developDiff}\n${finalDiff.slice(0, 14_000)}\n\n${text.typecheckResult}\n${typecheck.passed ? text.pass : text.fail}\n${typecheck.output.slice(0, 3500)}`,
           1000,
+          "json",
         );
-        const review = parseObject<Review>(reviewText);
+        const review = parseReview(reviewText);
         finalTestOutput = `${text.typecheckLabel}: ${typecheck.passed ? text.pass : text.fail}\n${typecheck.output}\n\n${text.reviewLabel}: ${text.completedReview(review.passed, review.summary)}\n${(review.feedback || []).join("\n")}`;
         finalReview = review.summary || "";
         passed = typecheck.passed && review.passed;

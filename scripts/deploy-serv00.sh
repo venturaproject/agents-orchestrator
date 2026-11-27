@@ -68,9 +68,14 @@ ssh "${SSH_ARGS[@]}" "$TARGET" \
      if curl --fail --silent --show-error --max-time 5 'https://$BACKEND_DOMAIN/api/health' >/dev/null; then break; fi
      if [ \"\$attempt\" -eq 20 ]; then echo 'NestJS health check failed; frontend was not restarted.' >&2; exit 1; fi
      sleep 3
-   done &&
-   cd '$FRONTEND_DIR' &&
-   npm ci --omit=dev &&
-   devil www restart '$FRONTEND_DOMAIN'"
+    done &&
+    cd '$FRONTEND_DIR' &&
+    npm ci --omit=dev &&
+    devil www restart '$FRONTEND_DOMAIN' &&
+    for attempt in \$(seq 1 20); do
+      if curl --fail --silent --show-error --max-time 5 'https://$FRONTEND_DOMAIN/' >/dev/null; then break; fi
+      if [ \"\$attempt\" -eq 20 ]; then echo 'Frontend smoke check failed after restart.' >&2; exit 1; fi
+      sleep 3
+    done"
 
 echo "Deployment complete: https://$FRONTEND_DOMAIN (API: https://$BACKEND_DOMAIN)"

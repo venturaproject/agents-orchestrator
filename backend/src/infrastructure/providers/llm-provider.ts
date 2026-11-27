@@ -1,4 +1,5 @@
 import { AgentProviderUnavailableError } from "../../application/agents/errors/agent-provider-unavailable.error";
+import type { LanguageModelOutputFormat } from "../../application/agents/ports/language-model";
 
 type Provider = "groq" | "nvidia";
 type ProviderResponse = {
@@ -61,11 +62,13 @@ async function requestProvider(
   system: string,
   content: string,
   maxTokens: number,
+  format: LanguageModelOutputFormat,
 ) {
   const payload = JSON.stringify({
     model: provider.model,
     temperature: 0.15,
     max_tokens: maxTokens,
+    ...(format === "json" ? { response_format: { type: "json_object" } } : {}),
     ...(provider.name === "nvidia" ? { chat_template_kwargs: { enable_thinking: false } } : {}),
     messages: [{ role: "system", content: system }, { role: "user", content }],
   });
@@ -85,30 +88,35 @@ async function requestProvider(
     await new Promise((resolve) => setTimeout(resolve, Math.min(Math.ceil(delay * 1000) + 250, 10_000)));
   }
 
-  if (!response.ok) throw new Error(`${provider.name === "groq" ? "Groq" : "NVIDIA"} respondió ${response.status}: ${body.error?.message || "error del proveedor"}`);
+  if (!response.ok) throw new Error(`HTTP_${response.status}`);
   const text = body.choices?.[0]?.message?.content;
   if (typeof text !== "string" || !text.trim()) {
     const finishReason = body.choices?.[0]?.finish_reason || "sin motivo indicado";
-    throw new Error(`${provider.name === "groq" ? "Groq" : "NVIDIA"} devolvió una respuesta vacía (${finishReason}).`);
+    throw new Error(`EMPTY_RESPONSE_${finishReason}`);
   }
   return text;
 }
 
-export async function callLanguageModel(system: string, content: string, maxTokens: number) {
+export async function callLanguageModel(
+  system: string,
+  content: string,
+  maxTokens: number,
+  format: LanguageModelOutputFormat = "text",
+) {
   const choices = providers();
   const errors: string[] = [];
 
   for (const provider of choices) {
     try {
-      const response = await requestProvider(provider, system, content, maxTokens);
+      const response = await requestProvider(provider, system, content, maxTokens, format);
       recordSuccess(provider.name);
       if (errors.length) console.warn(`[agents] ${provider.name} answered after provider failover.`);
       return response;
     } catch (error) {
-      const message = error instanceof Error ? error.message : "error desconocido";
-      errors.push(message);
+      const reason = error instanceof Error ? error.message : "ProviderError";
+      errors.push(`${provider.name}:${reason}`);
       recordFailure(provider.name);
-      console.warn(`[agents] ${provider.name} failed; ${choices.length > errors.length ? "trying fallback" : "no fallback available"}.`);
+      console.warn(`[agents] ${provider.name} failed (${reason}); ${choices.length > errors.length ? "trying fallback" : "no fallback available"}.`);
     }
   }
 

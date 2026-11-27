@@ -105,3 +105,47 @@ test("provider router supports NVIDIA-only setup and rejects missing keys", asyn
     restoreEnvironment(previous);
   }
 });
+
+test("provider router requests JSON mode when the application requires structured output", async () => {
+  const callLanguageModel = loadCallLanguageModel();
+  const keys = ["GROQ_API_KEY", "GROQ_MODEL", "NVIDIA_API_KEY", "NVIDIA_MODEL"];
+  const previous = Object.fromEntries(keys.map((key) => [key, process.env[key]]));
+  const oldFetch = globalThis.fetch;
+  process.env.GROQ_API_KEY = "";
+  process.env.NVIDIA_API_KEY = "test-nvidia-key";
+  let payload;
+  globalThis.fetch = async (_url, init) => {
+    payload = JSON.parse(init.body);
+    return response(modelResponse);
+  };
+  try {
+    await callLanguageModel("system", "prompt", 300, "json");
+    assert.deepEqual(payload.response_format, { type: "json_object" });
+  } finally {
+    globalThis.fetch = oldFetch;
+    restoreEnvironment(previous);
+  }
+});
+
+test("provider errors do not expose provider response details", async () => {
+  const callLanguageModel = loadCallLanguageModel();
+  const keys = ["GROQ_API_KEY", "GROQ_MODEL", "NVIDIA_API_KEY", "NVIDIA_MODEL"];
+  const previous = Object.fromEntries(keys.map((key) => [key, process.env[key]]));
+  const oldFetch = globalThis.fetch;
+  const warn = console.warn;
+  process.env.GROQ_API_KEY = "";
+  process.env.NVIDIA_API_KEY = "test-nvidia-key";
+  console.warn = () => {};
+  globalThis.fetch = async () => response({ error: { message: "private provider detail" } }, 401);
+  try {
+    await assert.rejects(callLanguageModel("system", "prompt", 300), (error) => {
+      assert.match(error.message, /nvidia:HTTP_401/);
+      assert.doesNotMatch(error.message, /private provider detail/);
+      return true;
+    });
+  } finally {
+    globalThis.fetch = oldFetch;
+    console.warn = warn;
+    restoreEnvironment(previous);
+  }
+});

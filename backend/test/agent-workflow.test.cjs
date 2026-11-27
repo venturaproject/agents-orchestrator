@@ -42,11 +42,13 @@ test("agent workflow scopes run lookup and every persisted update to its owner",
   };
   const modelResponses = [
     JSON.stringify({ summary: "Add a heading", tasks: ["Add heading"], files: ["app/page.tsx"] }),
-    "diff --git a/app/page.tsx b/app/page.tsx",
+    JSON.stringify({ patch: "diff --git a/app/page.tsx b/app/page.tsx\n" }),
     JSON.stringify({ passed: true, feedback: [], summary: "The change meets the request." }),
   ];
+  const formats = [];
   const model = {
-    async complete() {
+    async complete(_system, _content, _maxTokens, format) {
+      formats.push(format);
       const next = modelResponses.shift();
       assert.ok(next, "unexpected extra model call");
       return next;
@@ -61,6 +63,7 @@ test("agent workflow scopes run lookup and every persisted update to its owner",
   assert.ok(saved.length >= 4);
   assert.ok(saved.every((run) => run.userId === ownerId && run.id === runId));
   assert.equal(modelResponses.length, 0);
+  assert.deepEqual(formats, ["json", "json", "json"]);
 });
 
 test("agent workflow refuses to access a run that is not owned by the authenticated user", async () => {

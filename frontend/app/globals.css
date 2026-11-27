@@ -195,3 +195,34 @@
 :root[data-theme="light"] .run-card:hover,:root[data-theme="light"] .run-card:focus-visible{border-color:#a994d5;background:#faf8ff}
 :root[data-theme="light"] .empty-runs{border-color:#d5d8e2;color:#777d89}
 @media(max-width:700px){.run-card{gap:8px;padding:12px 10px}.run-card-copy strong{font-size:10px}.run-card-status{font-size:8px;padding:4px 6px}}
+.runs-toolbar{display:flex;align-items:center;gap:10px;margin:0 0 12px}
+.runs-search{display:flex;align-items:center;gap:8px;flex:1;min-width:170px;border:1px solid #292c36;border-radius:7px;background:#111319;padding:0 10px;color:#858a98}
+.runs-search:focus-within{border-color:#8065b7}
+.runs-search input{width:100%;height:34px;border:0;outline:0;background:transparent;color:#e0e1e8;font:inherit;font-size:10px}
+.runs-search input::placeholder{color:#777d8b}
+.runs-status-filter{display:flex;align-items:center;gap:8px;color:#858a98;font-size:10px}
+.runs-status-filter select{height:36px;border:1px solid #292c36;border-radius:7px;background:#111319;color:#d9dbe2;padding:0 25px 0 10px;font:inherit;font-size:10px}
+.runs-result-count{color:#858a98;font-size:10px;white-space:nowrap}
+.runs-clear-filter{border:0;background:transparent;color:#bd9aff;font:inherit;font-size:11px;cursor:pointer;text-decoration:underline}
+.run-card-status.en-curso,.run-card-status.in-progress{color:#e7c77d;background:#342d1e}
+.run-card-status.fallida,.run-card-status.failed{color:#ff9299;background:#351e25}
+.history-dot.red-dot{background:#ed6875;box-shadow:0 0 8px #ed687544}
+.diff-file-list{display:grid;gap:7px;margin-top:9px}
+.diff-file{overflow:hidden;border:1px solid #29342e;border-radius:6px;background:#0d120f}
+.diff-file>summary{display:flex;align-items:center;justify-content:space-between;gap:10px;list-style:none;padding:9px 10px;color:#c5cdc7;font:10px "DM Mono",monospace;cursor:pointer}
+.diff-file>summary::-webkit-details-marker{display:none}
+.diff-file-name{display:flex;align-items:center;gap:6px;min-width:0;overflow-wrap:anywhere}
+.diff-file-name svg{flex:none;transition:transform .15s ease}
+.diff-file[open]>summary .diff-file-name svg{transform:rotate(180deg)}
+.diff-line-counts{display:flex;gap:9px;white-space:nowrap}
+.diff-added{color:#70d99f}
+.diff-removed{color:#ff898f}
+.diff-file pre{margin:0;border:0!important;border-top:1px solid #29342e!important;border-radius:0!important}
+:root[data-theme="light"] .runs-search,:root[data-theme="light"] .runs-status-filter select{border-color:#dfe1e9;background:#fff;color:#30333e}
+:root[data-theme="light"] .runs-search input{color:#30333e}
+:root[data-theme="light"] .runs-search input::placeholder,:root[data-theme="light"] .runs-status-filter{color:#777d89}
+:root[data-theme="light"] .runs-clear-filter{color:#7654c5}
+:root[data-theme="light"] .diff-file{border-color:#d2e5d7;background:#fff}
+:root[data-theme="light"] .diff-file>summary{color:#3a453e}
+:root[data-theme="light"] .diff-file pre{border-color:#d2e5d7!important}
+@media(max-width:600px){.runs-toolbar{align-items:stretch;flex-wrap:wrap}.runs-search{flex-basis:100%}.runs-result-count{margin-left:auto}.run-card-copy small{font-size:9px}}

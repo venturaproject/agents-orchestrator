@@ -159,4 +159,38 @@ describe("Crew UI", () => {
     expect(screen.getByRole("button", { name: /^Activity/ }).getAttribute("aria-current")).toBe("page");
     expect(container.querySelector(".history-item.selected")?.textContent).toContain("Fix sidebar navigation");
   });
+
+  it("searches and filters the saved executions by status", async () => {
+    vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("/api/auth/session")) return jsonResponse({ user: { id: "user-1", email: "demo@example.test" } });
+      if (url.endsWith("/api/runs")) return jsonResponse({
+        runs: [
+          { id: "run-ok", prompt: "Add account settings", createdAt: "2026-11-27T10:00:00.000Z", status: "Completed", tasks: [], result: { summary: "Settings page" } },
+          { id: "run-failed", prompt: "Fix the payment flow", createdAt: "2026-11-26T10:00:00.000Z", status: "Failed", tasks: [], result: { summary: "Provider output was invalid" } },
+        ],
+      });
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    const user = userEvent.setup();
+    const { container } = render(<Home />);
+    await screen.findByRole("heading", { name: "Make work flow." });
+    await user.click(screen.getByRole("button", { name: "Agent runs" }));
+
+    expect(screen.getByText("2 of 2 runs")).toBeTruthy();
+    await user.selectOptions(screen.getByRole("combobox", { name: "Status" }), "completed");
+    expect(container.querySelector(".run-card")?.textContent).toContain("Add account settings");
+    expect(container.querySelectorAll(".run-card")).toHaveLength(1);
+
+    await user.selectOptions(screen.getByRole("combobox", { name: "Status" }), "all");
+    await user.type(screen.getByRole("searchbox", { name: "Search runs" }), "payment");
+    expect(container.querySelectorAll(".run-card")).toHaveLength(1);
+    expect(container.querySelector(".run-card")?.textContent).toContain("Fix the payment flow");
+
+    await user.clear(screen.getByRole("searchbox", { name: "Search runs" }));
+    await user.type(screen.getByRole("searchbox", { name: "Search runs" }), "does-not-exist");
+    expect(screen.getByText("No runs match these filters.")).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: "Clear filters" }));
+    expect(container.querySelectorAll(".run-card")).toHaveLength(2);
+  });
 });
